@@ -45,11 +45,33 @@ int y_tri[3];
 int width = 800;
 int height = 600;
 
+
+pair<float,float> calcularCentroide(forward_list<Vertice>& pontos) {
+    pair<float,float> centroide = {0.0, 0.0};
+    int numPontos = 0;
+
+    for (auto it = pontos.begin(); it != pontos.end(); ++it) {
+        centroide.first += it->x;
+        centroide.second += it->y;
+        numPontos++;
+	}
+
+    if (numPontos > 0) {
+        centroide.first = round(centroide.first/numPontos);
+        centroide.second = round(centroide.second/numPontos);
+    }
+
+    return centroide;
+}
+
 void pushForma(int tipo){
     Forma f;
     f.tipo = tipo;
     lista_formas.push_front(f);
 }
+
+
+
 
 void pushVertice(int x, int y){
     Vertice v;
@@ -93,7 +115,7 @@ void keyboard(unsigned char key, int x, int y);
 void mouse(int button, int state, int x, int y);
 void mousePassiveMotion(int x, int y);
 void drawPixel(int x, int y);
-void drawFormas();
+void desenhaFormas();
 void Linhabresenham(double x1,double y1,double x2,double y2);
 void CirculoBresenham(double x1, double y1, double x2, double y2);
 void translacao(int dx, int dy);
@@ -160,7 +182,7 @@ void reshape(int w, int h){
 void display(void){
     glClear(GL_COLOR_BUFFER_BIT); //Limpa o buffer de cores e reinicia a matriz
     glColor3f (0.0, 0.0, 0.0); // Seleciona a cor default como preto
-    drawFormas(); // Desenha as s geometricas da lista
+    desenhaFormas(); // Desenha as s geometricas da lista
     //Desenha texto com as coordenadas da posicao do mouse
     draw_text_stroke(0, 0, "(" + to_string(x_m) + "," + to_string(y_m) + ")", 0.2);
     glutSwapBuffers(); // manda o OpenGl renderizar as primitivas
@@ -315,7 +337,7 @@ void drawPixel(int x, int y){
 	glEnd();	
 }
 
-void drawFormas(){
+void desenhaFormas(){
     //Apos o primeiro clique, desenha a reta com a posicao atual do mouse
     if(click1){
     	switch (mode){
@@ -551,25 +573,20 @@ void escala(float sx, float sy) {
         // Encontrar o centro do objeto
         float centro_x = 0.0;
         float centro_y = 0.0;
+		auto par = calcularCentroide(it_forma->lista_vertices);
+		centro_x = par.first;
+		centro_y = par.second;
+        
 
-        // Contar o número de vértices
-        int numVertices = 0;
+        
 
-        for (auto it_vertice = it_forma->lista_vertices.begin(); it_vertice != it_forma->lista_vertices.end(); ++it_vertice) {
-            centro_x += it_vertice->x;
-            centro_y += it_vertice->y;
-            numVertices++;
-        }
-
-        if (numVertices > 0) {
-            centro_x /= numVertices;
-            centro_y /= numVertices;
+        
 
             // Escala em relação ao centro do objeto
             for (auto it_vertice = it_forma->lista_vertices.begin(); it_vertice != it_forma->lista_vertices.end(); ++it_vertice) {
                 it_vertice->x = static_cast<int>((it_vertice->x - centro_x) * sx + centro_x);
                 it_vertice->y = static_cast<int>((it_vertice->y - centro_y) * sy + centro_y);
-            }
+            
         }
     }
     glutPostRedisplay();
@@ -577,22 +594,13 @@ void escala(float sx, float sy) {
 
 void cisalhamento(float shx, float shy) {
     for (auto it_forma = lista_formas.begin(); it_forma != lista_formas.end(); ++it_forma) {
-        // Encontrar o centro do objeto
         float centro_x = 0.0;
         float centro_y = 0.0;
+		auto par = calcularCentroide(it_forma->lista_vertices);
+		centro_x = par.first;
+		centro_y = par.second;
 
-        // Contar o número de vértices
-        int numVertices = 0;
-
-        for (auto it_vertice = it_forma->lista_vertices.begin(); it_vertice != it_forma->lista_vertices.end(); ++it_vertice) {
-            centro_x += it_vertice->x;
-            centro_y += it_vertice->y;
-            numVertices++;
-        }
-
-        if (numVertices > 0) {
-            centro_x /= numVertices;
-            centro_y /= numVertices;
+        
 
             // Aplicar cisalhamento em relação ao centro do objeto
             for (auto it_vertice = it_forma->lista_vertices.begin(); it_vertice != it_forma->lista_vertices.end(); ++it_vertice) {
@@ -600,8 +608,8 @@ void cisalhamento(float shx, float shy) {
                 int y = it_vertice->y + static_cast<int>(shy * (it_vertice->x - centro_x));
                 it_vertice->x = x;
                 it_vertice->y = y;
-            }
-        }
+            
+        	}
     }
     glutPostRedisplay();
 }
@@ -611,22 +619,13 @@ void reflexao(bool horizontal, bool vertical) {
     int v = (vertical) ? -1 : 1;
 
     for (auto it_forma = lista_formas.begin(); it_forma != lista_formas.end(); ++it_forma) {
-        // Encontrar o centro do objeto
         float centro_x = 0.0;
         float centro_y = 0.0;
+		auto par = calcularCentroide(it_forma->lista_vertices);
+		centro_x = par.first;
+		centro_y = par.second;
 
-        // Contar o número de vértices
-        int numVertices = 0;
-
-        for (auto it_vertice = it_forma->lista_vertices.begin(); it_vertice != it_forma->lista_vertices.end(); ++it_vertice) {
-            centro_x += it_vertice->x;
-            centro_y += it_vertice->y;
-            numVertices++;
-        }
-
-        if (numVertices > 0) {
-            centro_x /= numVertices;
-            centro_y /= numVertices;
+        
 
             // Transladar para a origem
             for (auto it_vertice = it_forma->lista_vertices.begin(); it_vertice != it_forma->lista_vertices.end(); ++it_vertice) {
@@ -645,7 +644,7 @@ void reflexao(bool horizontal, bool vertical) {
                 it_vertice->x += centro_x;
                 it_vertice->y += centro_y;
             }
-        }
+        
     }
 
     glutPostRedisplay();
@@ -655,22 +654,13 @@ void rotacao(float angle) {
     float radians = angle * 3.14159265 / 180.0;
 
     for (auto it_forma = lista_formas.begin(); it_forma != lista_formas.end(); ++it_forma) {
-        // Encontrar o centro do objeto
         float centro_x = 0.0;
         float centro_y = 0.0;
+		auto par = calcularCentroide(it_forma->lista_vertices);
+		centro_x = par.first;
+		centro_y = par.second;
 
-        // Contar o número de vértices
-        int numVertices = 0;
-
-        for (auto it_vertice = it_forma->lista_vertices.begin(); it_vertice != it_forma->lista_vertices.end(); ++it_vertice) {
-            centro_x += it_vertice->x;
-            centro_y += it_vertice->y;
-            numVertices++;
-        }
-
-        if (numVertices > 0) {
-            centro_x /= numVertices;
-            centro_y /= numVertices;
+        
 
             // Transladar para a origem
             for (auto it_vertice = it_forma->lista_vertices.begin(); it_vertice != it_forma->lista_vertices.end(); ++it_vertice) {
@@ -692,7 +682,7 @@ void rotacao(float angle) {
                 it_vertice->y += centro_y;
             }
         }
-    }
+    
 
     glutPostRedisplay();
 }
