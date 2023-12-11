@@ -50,8 +50,8 @@ struct Cor {
     float r, g, b;  // RGB color components
 };
 
-int width = 800;
-int height = 600;
+int width = 1200;
+int height = 900;
 int qtd = 0; // os primeiros qtd poligonos são pintados
 // Marca os pixels já visitados para o algoritmo floodfill
 
@@ -161,7 +161,7 @@ int main(int argc, char** argv){
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
 	glutInitWindowSize(width, height);
 	glutInitWindowPosition(100,100);
-	glutCreateWindow("Paint");
+	glutCreateWindow("Projeto Paint");
 	
 	init();
 	
@@ -655,11 +655,8 @@ void CirculoBresenham(double x1, double y1, double x2, double y2){
 
 
 void paintPolygon(Forma& polygon) {
-    if (lista_formas.empty()) {
-        return;  // No polygon to fill
-    }
-	
-    // Assuming the last added shape is the polygon
+    
+    
 
     
 
@@ -673,7 +670,7 @@ void paintPolygon(Forma& polygon) {
         maxY = max(maxY, v.y);
     }
 
-    // Define a color for filling (you can customize this)
+    
 
     // Iterate through scanlines within the bounding box
     for (int y = minY; y <= maxY; ++y) {
@@ -735,11 +732,6 @@ void escala(float sx, float sy) {
 		centro_x = par.first;
 		centro_y = par.second;
         
-
-        
-
-        
-
             // Escala em relação ao centro do objeto
             for (auto it_vertice = it_forma->lista_vertices.begin(); it_vertice != it_forma->lista_vertices.end(); ++it_vertice) {
                 it_vertice->x = static_cast<int>((it_vertice->x - centro_x) * sx + centro_x);
@@ -857,39 +849,5 @@ void rotacao(float angle) {
 
     glutPostRedisplay();
 }
-/*void rotacao(float angle) {
-    float radians = angle * 3.14159265 / 180.0;
 
-    for (auto it_forma = lista_formas.begin(); it_forma != lista_formas.end(); ++it_forma) {
-        float centro_x = 0.0;
-        float centro_y = 0.0;
-		auto par = calcularCentroide(it_forma->lista_vertices);
-		centro_x = par.first;
-		centro_y = par.second;
 
-        
-
-            // Transladar para a origem
-            for (auto it_vertice = it_forma->lista_vertices.begin(); it_vertice != it_forma->lista_vertices.end(); ++it_vertice) {
-                it_vertice->x -= centro_x;
-                it_vertice->y -= centro_y;
-            }
-
-            // Rotacionar
-            for (auto it_vertice = it_forma->lista_vertices.begin(); it_vertice != it_forma->lista_vertices.end(); ++it_vertice) {
-                int x = static_cast<int>(it_vertice->x * cos(radians) - it_vertice->y * sin(radians));
-                int y = static_cast<int>(it_vertice->x * sin(radians) + it_vertice->y * cos(radians));
-                it_vertice->x = x;
-                it_vertice->y = y;
-            }
-
-            // Transladar de volta para a posição original
-            for (auto it_vertice = it_forma->lista_vertices.begin(); it_vertice != it_forma->lista_vertices.end(); ++it_vertice) {
-                it_vertice->x += centro_x;
-                it_vertice->y += centro_y;
-            }
-        }
-    
-
-    glutPostRedisplay();
-}*/
