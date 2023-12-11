@@ -1,3 +1,10 @@
+/*
+ * Computacao Grafica
+ * Codigo Exemplo: Rasterizacao de Segmentos de Reta com GLUT/OpenGL
+ * Autor: Prof. Laurindo de Sousa Britto Neto
+ */
+
+// Bibliotecas utilizadas pelo OpenGL
 #ifdef __APPLE__
     #define GL_SILENCE_DEPRECATION
     #include <GLUT/glut.h>
@@ -10,8 +17,11 @@
 #endif
 
 #include <cmath>
-#include <cstdio>
 #include <cstdlib>
+#include <stack>
+#include <cstdio>
+#include <vector>
+#include <algorithm>
 #include <forward_list>
 #include "glut_text.h"
 
@@ -21,16 +31,36 @@ using namespace std;
 struct Vertice{
 	int x;
 	int y;
+	
+	Vertice(int _x, int _y){
+		this->x = _x;
+		this->y = _y;
+	}
+	
+	Vertice(){
+		
+	}
 };
 
 struct Forma{
 	int tipo;
 	forward_list<Vertice> lista_vertices;
 };
+struct Cor {
+    float r, g, b;  // RGB color components
+};
+
+int width = 800;
+int height = 600;
+int qtd = 0; // os primeiros qtd poligonos são pintados
+// Marca os pixels já visitados para o algoritmo floodfill
+
+
+// Função para verificar se duas cores são iguais
 
 forward_list<Forma> lista_formas;
 
-enum formType{LIN = 1, TRI = 2, RET = 3, POL = 4, CIR = 5 , TRA = 6, ESL = 7, CIS = 8, REF = 9, ROT = 10};
+enum formType{LIN = 1, TRI = 2, RET = 3, POL = 4, CIR = 5 , FLOOD = 6,TRA = 7, ESL = 8, CIS = 9, REF = 10, ROT = 11};
 
 int mode = LIN;
 bool click1 = false;
@@ -42,14 +72,14 @@ int x_origem,y_origem; // coordenadas de inicio do poligono
 int x_tri[3];
 int y_tri[3];
 
-int width = 800;
-int height = 600;
+
+
 
 
 pair<float,float> calcularCentroide(forward_list<Vertice>& pontos) {
     pair<float,float> centroide = {0.0, 0.0};
     int numPontos = 0;
-
+	
     for (auto it = pontos.begin(); it != pontos.end(); ++it) {
         centroide.first += it->x;
         centroide.second += it->y;
@@ -123,7 +153,9 @@ void escala(float sx, float sy);
 void cisalhamento(float shx, float shy);
 void reflexao(bool horizontal, bool vertical);
 void rotacao(float angle);
-
+void floodFill(int x, int y, Cor old_col, Cor new_col);
+void scanlineFill(int y, int x1, int y1, int x2, int y2);
+void paintPolygon(Forma& polygon);
 int main(int argc, char** argv){
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
@@ -145,6 +177,7 @@ int main(int argc, char** argv){
     glutAddMenuEntry("Retangulo", RET);
 	glutAddMenuEntry("Poligono", POL);
 	glutAddMenuEntry("Circulo", CIR);
+	glutAddMenuEntry("Pintar", FLOOD);
 	glutAddMenuEntry("Translacao", TRA);
     glutAddMenuEntry("Escala", ESL);
     glutAddMenuEntry("Cisalhamento", CIS);
@@ -191,11 +224,14 @@ void display(void){
 void menu_popup(int value){
 	 if (value == 0) exit(EXIT_SUCCESS);
     switch (value){
-		case 6: translacao(20, 20); break;
-		case 7: escala(0.5, 0.5); break;
-		case 8: cisalhamento(0.7, 0); break;
-		case 9: reflexao(false, true); break;
-		case 10: rotacao(45); break;
+		case 6 : 
+			qtd = distance(lista_formas.begin(), lista_formas.end());
+			break;
+		case 7: translacao(20, 20); break;
+		case 8: escala(0.5, 0.5); break;
+		case 9: cisalhamento(0.7, 0); break;
+		case 10: reflexao(false, true); break;
+		case 11: rotacao(45); break;
 	}  
     mode = value;
 }
@@ -214,6 +250,18 @@ void keyboard(unsigned char key, int x, int y){
                 glutPostRedisplay();
             }
             break;
+        case 'a':
+        	translacao(-20,0);
+			break;
+		case 'd':
+        	translacao(20,0);
+			break;
+		case 'w':
+			translacao(0,20);
+			break;
+		case 's':
+			translacao(0,-20);
+			break;
     }
 
     
@@ -321,6 +369,8 @@ void mouse(int button, int state, int x, int y){
 							glutPostRedisplay();
                         }
 					}
+					break;
+				
             }
  			break;
     }
@@ -328,14 +378,45 @@ void mouse(int button, int state, int x, int y){
 
 void mousePassiveMotion(int x, int y){
     x_m = x; y_m = height - y - 1;
-    //glutPostRedisplay();
+    glutPostRedisplay();
 }
 
 void drawPixel(int x, int y){
+	
 	glBegin(GL_POINTS);
 		glVertex2i(x, y);
 	glEnd();	
 }
+
+void drawPixel2(int x, int y){
+	glColor3f(1, 0, 0);
+	glBegin(GL_POINTS);
+		glVertex2i(x, y);
+	glEnd();	
+}
+
+void inserirCor(Forma& polygon){
+		Forma f;
+		f.tipo = RET;
+		int x[2];
+		int y[2];
+		int i = 0;
+		for(auto v = polygon.lista_vertices.begin(); v != polygon.lista_vertices.end(); v++, i++){
+                    x[i] = v->x;
+                    y[i] = v->y;
+		}
+		Vertice v1(x[0],y[0]);
+		Vertice v2(x[0],y[1]); 
+		Vertice v3(x[1],y[1]); 
+		Vertice v4(x[1],y[0]);  
+		f.lista_vertices.push_front(v1);
+		f.lista_vertices.push_front(v2);
+		f.lista_vertices.push_front(v3);
+		f.lista_vertices.push_front(v4);
+		paintPolygon(f);
+	
+}
+
 
 void desenhaFormas(){
     //Apos o primeiro clique, desenha a reta com a posicao atual do mouse
@@ -354,10 +435,10 @@ void desenhaFormas(){
                 Linhabresenham(x_1, y_m, x_1, y_1);
                 break;
             case CIR:
-            	CirculoBresenham(x_1, y_1, x_2, y_2);
             	break;
             case POL:
             	Linhabresenham(x_1,y_1,x_2,y_2);
+            	Linhabresenham(x_2,y_2,x_m,y_m);
             	break;
         	
 		
@@ -374,7 +455,10 @@ void desenhaFormas(){
 	}
     
     //Percorre a lista de s geometricas para desenhar
-    for(forward_list<Forma>::iterator f = lista_formas.begin(); f != lista_formas.end(); f++){
+    int cnt = 0;
+    int sz = distance(lista_formas.begin(),lista_formas.end());
+    int val = sz - qtd;
+	for(forward_list<Forma>::iterator f = lista_formas.begin(); f != lista_formas.end(); f++, cnt++){
     	bool last = f == lista_formas.begin();
 		int i = 0, x[3], y[3];
         switch (f->tipo){
@@ -396,6 +480,8 @@ void desenhaFormas(){
   				Linhabresenham(x[0], y[0], x[1], y[1]);
         		Linhabresenham(x[1], y[1], x[2], y[2]);
         		Linhabresenham(x[2], y[2], x[0], y[0]);
+        		if(cnt >= val)
+					paintPolygon(*f);
     			break;
     			
             case RET:
@@ -409,6 +495,8 @@ void desenhaFormas(){
                 Linhabresenham(x[1], y[0], x[1], y[1]);
                 Linhabresenham(x[1], y[1], x[0], y[1]);
                 Linhabresenham(x[0], y[1], x[0], y[0]);
+                if(cnt >= val)
+					inserirCor(*f);
                 break;
             
             case CIR:
@@ -418,6 +506,7 @@ void desenhaFormas(){
                     y[i] = v->y;
                 }
 				//Desenha o segmento de reta apos dois cliques
+				glColor3f(0, 0, 0);
 				CirculoBresenham(x[0], y[0], x[1], y[1]);
                 break;
             case POL:
@@ -433,9 +522,13 @@ void desenhaFormas(){
 					Linhabresenham(aux->x,aux->y,proximo->x,proximo->y);
 					aux++;
 				}
+				if(!(last && poligono) )
+					if(cnt >= val)
+						paintPolygon(*f);
 				break;
 			}
 	}
+	
 }
 
 
@@ -558,6 +651,71 @@ void CirculoBresenham(double x1, double y1, double x2, double y2){
 	}
 }
 
+
+
+
+void paintPolygon(Forma& polygon) {
+    if (lista_formas.empty()) {
+        return;  // No polygon to fill
+    }
+	
+    // Assuming the last added shape is the polygon
+
+    
+
+    // Find the bounding box of the polygon
+    int minX = width, minY = height, maxX = 0, maxY = 0;
+    for (auto it = polygon.lista_vertices.begin();it !=polygon.lista_vertices.end();it++) {
+        auto v = *it;
+		minX = min(minX, v.x);
+        minY = min(minY, v.y);
+        maxX = max(maxX, v.x);
+        maxY = max(maxY, v.y);
+    }
+
+    // Define a color for filling (you can customize this)
+
+    // Iterate through scanlines within the bounding box
+    for (int y = minY; y <= maxY; ++y) {
+        vector<int> intersections;
+
+        // Find intersections with polygon edges
+        auto current = polygon.lista_vertices.begin();
+        auto next = current;
+        ++next;
+        for (; current != polygon.lista_vertices.end(); ++current, ++next) {
+            if (next == polygon.lista_vertices.end()) {
+                next = polygon.lista_vertices.begin();
+            }
+
+            int x1 = current->x, y1 = current->y;
+            int x2 = next->x, y2 = next->y;
+
+            if ((y1 <= y && y2 > y) || (y1 > y && y2 <= y)) {
+                // Edge crosses the scanline
+                int x_intersection = static_cast<int>(x1 + (static_cast<double>(y - y1) / (y2 - y1)) * (x2 - x1));
+                intersections.push_back(x_intersection);
+            }
+        }
+
+        // Sort the intersection points
+        sort(intersections.begin(), intersections.end());
+		
+        // Fill the scanline between pairs of intersections
+        for (size_t i = 0; i < intersections.size(); i += 2) {
+            int x1 = intersections[i];
+            int x2 = (i + 1 < intersections.size()) ? intersections[i + 1] : x1;
+
+            for (int x = x1; x <= x2; ++x) {
+				drawPixel2(x, y);
+            }
+        }
+    }
+
+    glutPostRedisplay();
+}
+
+
 void translacao(int dx, int dy) {
     for (auto it_forma = lista_formas.begin(); it_forma != lista_formas.end(); ++it_forma) {
         for (auto it_vertice = it_forma->lista_vertices.begin(); it_vertice != it_forma->lista_vertices.end(); ++it_vertice) {
@@ -591,6 +749,10 @@ void escala(float sx, float sy) {
     }
     glutPostRedisplay();
 }
+
+
+
+
 
 void cisalhamento(float shx, float shy) {
     for (auto it_forma = lista_formas.begin(); it_forma != lista_formas.end(); ++it_forma) {
@@ -654,6 +816,51 @@ void rotacao(float angle) {
     float radians = angle * 3.14159265 / 180.0;
 
     for (auto it_forma = lista_formas.begin(); it_forma != lista_formas.end(); ++it_forma) {
+        // Encontrar o centro do objeto
+        float centro_x = 0.0;
+        float centro_y = 0.0;
+
+        // Contar o número de vértices
+        int numVertices = 0;
+
+        for (auto it_vertice = it_forma->lista_vertices.begin(); it_vertice != it_forma->lista_vertices.end(); ++it_vertice) {
+            centro_x += it_vertice->x;
+            centro_y += it_vertice->y;
+            numVertices++;
+        }
+
+        if (numVertices > 0) {
+            centro_x /= numVertices;
+            centro_y /= numVertices;
+
+            // Transladar para a origem
+            for (auto it_vertice = it_forma->lista_vertices.begin(); it_vertice != it_forma->lista_vertices.end(); ++it_vertice) {
+                it_vertice->x -= centro_x;
+                it_vertice->y -= centro_y;
+            }
+
+            // Rotacionar
+            for (auto it_vertice = it_forma->lista_vertices.begin(); it_vertice != it_forma->lista_vertices.end(); ++it_vertice) {
+                int x = static_cast<int>(it_vertice->x * cos(radians) - it_vertice->y * sin(radians));
+                int y = static_cast<int>(it_vertice->x * sin(radians) + it_vertice->y * cos(radians));
+                it_vertice->x = x;
+                it_vertice->y = y;
+            }
+
+            // Transladar de volta para a posição original
+            for (auto it_vertice = it_forma->lista_vertices.begin(); it_vertice != it_forma->lista_vertices.end(); ++it_vertice) {
+                it_vertice->x += centro_x;
+                it_vertice->y += centro_y;
+            }
+        }
+    }
+
+    glutPostRedisplay();
+}
+/*void rotacao(float angle) {
+    float radians = angle * 3.14159265 / 180.0;
+
+    for (auto it_forma = lista_formas.begin(); it_forma != lista_formas.end(); ++it_forma) {
         float centro_x = 0.0;
         float centro_y = 0.0;
 		auto par = calcularCentroide(it_forma->lista_vertices);
@@ -685,4 +892,4 @@ void rotacao(float angle) {
     
 
     glutPostRedisplay();
-}
+}*/
